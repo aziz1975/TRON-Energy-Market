@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tron Energy Market</title>
+  </head>
+  <body>
+    <h1>Tron Energy Market</h1>
+
+    <h2>Create New Offer</h2>
+    <input type="number" id="amount" placeholder="Amount" />
+    <input type="number" id="price" placeholder="Price in TRX" />
+    <button id="createOfferButton">Create Offer</button>
+
+    <h2>Browse Active Offers</h2>
+    <ul id="offersList"></ul>
+
+    <h2>Fulfill Offer</h2>
+    <input type="number" id="offerId" placeholder="Offer ID" />
+    <button id="fulfillOfferButton">Fulfill Offer</button>
+
+    <script src="https://cdn.jsdelivr.net/npm/tronweb/dist/TronWeb.js"></script>
+    <script>
+      let tronWeb;
+      let tronEnergyMarketContract;
+      const contractAddress = "TKEFtNJsTrJXSAHDoMa6jFg7PXtWdGYeg9";
+
+      async function requestAccount() {
+        try {
+          const accounts = await tronLink.request({
+            method: "tron_requestAccounts",
+          });
+          console.log("Connected account:", accounts[0]);
+          return accounts[0];
+        } catch (error) {
+          console.error("Error requesting account:", error);
+          alert("Please connect your TronLink wallet.");
+          throw error; // Halt execution if account is not available
+        }
+      }
+
+      async function setTronEnergyMarketContract() {
+        try {
+          if (window.tronWeb && window.tronWeb.ready) {
+            tronWeb = window.tronWeb;
+            tronEnergyMarketContract = await tronWeb
+              .contract()
+              .at(contractAddress);
+            console.log("Contract successfully initialized");
+          } else {
+            console.error(
+              "TronWeb not detected. Ensure TronLink is installed and connected."
+            );
+            alert(
+              "Please install TronLink and connect to the correct network."
+            );
+          }
+        } catch (error) {
+          console.error("Error setting contract:", error);
+        }
+      }
+
+      async function createOffer() {
+        const amount = document.getElementById("amount").value;
+        const price = document.getElementById("price").value;
+
+        try {
+          const result = await tronEnergyMarketContract
+            .createOffer(amount, tronWeb.toSun(price))
+            .send({
+              feeLimit: 100_000_000,
+              callValue: 0,
+              shouldPollResponse: true,
+            });
+          alert("Offer created successfully!");
+          loadActiveOffers(); // Refresh the list of offers
+        } catch (error) {
+          console.error("Error creating offer:", error);
+        }
+      }
+
+      async function loadActiveOffers() {
+        const offersList = document.getElementById("offersList");
+        offersList.innerHTML = ""; // Clear the list
+
+        try {
+          const activeOfferIds = await tronEnergyMarketContract
+            .getActiveOffers()
+            .call();
+          for (let i = 0; i < activeOfferIds.length; i++) {
+            const offer = await tronEnergyMarketContract
+              .offers(activeOfferIds[i])
+              .call();
+            const listItem = document.createElement("li");
+            listItem.textContent = `Offer ID: ${activeOfferIds[i]}, Seller: ${
+              offer.seller
+            }, Amount: ${offer.amount}, Price: ${tronWeb.fromSun(
+              offer.price
+            )} TRX`;
+            offersList.appendChild(listItem);
+          }
+        } catch (error) {
+          console.error("Error loading offers:", error);
+        }
+      }
+
+      async function fulfillOffer() {
+        const offerId = document.getElementById("offerId").value;
+
+        try {
+          const offer = await tronEnergyMarketContract.offers(offerId).call();
+          const totalPrice = offer.amount * offer.price; // In SUN
+
+          const result = await tronEnergyMarketContract
+            .fulfillOffer(offerId)
+            .send({
+              feeLimit: 100_000_000,
+              callValue: totalPrice,
+              shouldPollResponse: true,
+            });
+          alert("Offer fulfilled successfully!");
+          loadActiveOffers(); // Refresh the list of offers
+        } catch (error) {
+          console.error("Error fulfilling offer:", error);
+        }
+      }
+
+      // Initialize the contract and load offers when the page loads
+      window.onload = async function () {
+        try {
+          await requestAccount(); // Request user account early
+          await setTronEnergyMarketContract();
+          loadActiveOffers();
+        } catch (error) {
+          console.error("Initialization failed:", error);
+        }
+      };
+
+      // Attach event listeners
+      document.getElementById("createOfferButton").onclick = createOffer;
+      document.getElementById("fulfillOfferButton").onclick = fulfillOffer;
+    </script>
+  </body>
+</html>
