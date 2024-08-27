@@ -20,6 +20,11 @@
     <input type="number" id="offerId" placeholder="Offer ID" />
     <button id="fulfillOfferButton">Fulfill Offer</button>
 
+    <h2>Transfer Energy</h2>
+    <input type="text" id="toAddress" placeholder="Recipient Address" />
+    <input type="number" id="energyAmount" placeholder="Energy Amount" />
+    <button id="transferEnergyButton">Transfer Energy</button>
+
     <script src="https://cdn.jsdelivr.net/npm/tronweb/dist/TronWeb.js"></script>
     <script>
       let tronWeb;
@@ -36,7 +41,7 @@
         } catch (error) {
           console.error("Error requesting account:", error);
           alert("Please connect your TronLink wallet.");
-          throw error; // Halt execution if account is not available
+          throw error;
         }
       }
 
@@ -74,7 +79,7 @@
               shouldPollResponse: true,
             });
           alert("Offer created successfully!");
-          loadActiveOffers(); // Refresh the list of offers
+          loadActiveOffers();
         } catch (error) {
           console.error("Error creating offer:", error);
         }
@@ -82,7 +87,7 @@
 
       async function loadActiveOffers() {
         const offersList = document.getElementById("offersList");
-        offersList.innerHTML = ""; // Clear the list
+        offersList.innerHTML = "";
 
         try {
           const activeOfferIds = await tronEnergyMarketContract
@@ -110,7 +115,7 @@
 
         try {
           const offer = await tronEnergyMarketContract.offers(offerId).call();
-          const totalPrice = offer.amount * offer.price; // In SUN
+          const totalPrice = offer.amount * offer.price;
 
           const result = await tronEnergyMarketContract
             .fulfillOffer(offerId)
@@ -120,16 +125,52 @@
               shouldPollResponse: true,
             });
           alert("Offer fulfilled successfully!");
-          loadActiveOffers(); // Refresh the list of offers
+          loadActiveOffers();
         } catch (error) {
           console.error("Error fulfilling offer:", error);
+        }
+      }
+
+      async function transferEnergy() {
+        const toAddress = document.getElementById("toAddress").value;
+        const energyAmount = document.getElementById("energyAmount").value;
+
+        const minimumBalance = 1 * 1e6;
+        const requestBody = {
+          owner_address: tronWeb.address.toHex(tronWeb.defaultAddress.base58),
+          receiver_address: tronWeb.address.toHex(toAddress),
+          resource: "ENERGY",
+          balance: Math.max(parseInt(energyAmount), minimumBalance),
+          lock: true,
+        };
+        console.log("from address: " + tronWeb.defaultAddress.base58);
+        console.log("to address: " + toAddress);
+
+        try {
+          const response = await fetch(
+            "https://nile.trongrid.io/wallet/delegateresource",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(requestBody),
+            }
+          );
+
+          const result = await response.json();
+          console.log("Energy transferred:", result);
+          alert("Energy transferred successfully!");
+        } catch (error) {
+          console.error("Error transferring energy:", error);
+          alert("Energy transfer failed.");
         }
       }
 
       // Initialize the contract and load offers when the page loads
       window.onload = async function () {
         try {
-          await requestAccount(); // Request user account early
+          await requestAccount();
           await setTronEnergyMarketContract();
           loadActiveOffers();
         } catch (error) {
@@ -140,6 +181,7 @@
       // Attach event listeners
       document.getElementById("createOfferButton").onclick = createOffer;
       document.getElementById("fulfillOfferButton").onclick = fulfillOffer;
+      document.getElementById("transferEnergyButton").onclick = transferEnergy;
     </script>
   </body>
 </html>
