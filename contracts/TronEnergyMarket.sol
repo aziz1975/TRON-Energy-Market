@@ -36,8 +36,8 @@ contract TronEnergyMarket {
 
     // logging if offer fulfillment fails
     event OfferFulfillmentFailed(
-        uint256 offerId, 
-        address buyer, 
+        uint256 indexed offerId, 
+        address indexed buyer, 
         uint256 amount, 
         string reason
         );
